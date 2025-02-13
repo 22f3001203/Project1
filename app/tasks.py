@@ -1,71 +1,135 @@
 import subprocess
 import os
+import datetime
+import json
+import glob
+import requests
 from app.utils import read_file
 
+
+
+DATA_DIR = "/data/"
+
 def install_uv():
-    """Install uv package if not already installed"""
+    """Ensure uv is installed"""
     try:
         subprocess.run(["uv", "--version"], check=True)
     except FileNotFoundError:
         subprocess.run(["pip", "install", "uv"], check=True)
 
 def run_datagen(email):
-    """Run datagen.py script with the user's email"""
-    install_uv()  # Ensure uv is installed
-    subprocess.run(["python", "-m", "pip", "install", "requests"])  # Install requests
-    subprocess.run(["python", "-c", f"import requests; exec(requests.get('https://raw.githubusercontent.com/sanand0/tools-in-data-science-public/tds-2025-01/project-1/datagen.py').text)", email])
+    """Download and run datagen.py"""
+    install_uv()
+    subprocess.run(["python", "-m", "pip", "install", "requests"], check=True)
+
+    datagen_path = os.path.join(DATA_DIR, "datagen.py")
+    
+    # Download the script first before executing it
+    try:
+        response = requests.get("https://raw.githubusercontent.com/sanand0/tools-in-data-science-public/tds-2025-01/project-1/datagen.py")
+        response.raise_for_status()
+        with open(datagen_path, "w") as f:
+            f.write(response.text)
+        
+        subprocess.run(["python", datagen_path, email], check=True)
+        return "Datagen script executed successfully."
+    except requests.RequestException as e:
+        return f"Error fetching datagen.py: {str(e)}"
+
+def ensure_prettier():
+    """Ensure Prettier is installed"""
+    try:
+        subprocess.run(["npx", "prettier", "--version"], check=True)
+    except FileNotFoundError:
+        subprocess.run(["npm", "install", "-g", "prettier"], check=True)
 
 def format_markdown():
     """Format markdown file using Prettier"""
-    subprocess.run(["npx", "prettier@3.4.2", "--write", "/data/format.md"], check=True)
-
-import datetime
+    ensure_prettier()
+    md_file = os.path.join(DATA_DIR, "format.md")
+    
+    if not os.path.exists(md_file):
+        return "Markdown file not found."
+    
+    subprocess.run(["npx", "prettier", "--write", md_file], check=True)
+    return "Markdown file formatted."
 
 def count_wednesdays():
-    """Count the number of Wednesdays in /data/dates.txt"""
-    with open("/data/dates.txt", "r") as f:
+    """Count Wednesdays in dates.txt"""
+    file_path = os.path.join(DATA_DIR, "dates.txt")
+    output_path = os.path.join(DATA_DIR, "dates-wednesdays.txt")
+
+    if not os.path.exists(file_path):
+        return "Dates file not found."
+
+    with open(file_path, "r") as f:
         dates = f.readlines()
 
-    wednesday_count = sum(1 for date in dates if datetime.datetime.strptime(date.strip(), "%Y-%m-%d").weekday() == 2)
-
-    with open("/data/dates-wednesdays.txt", "w") as f:
-        f.write(str(wednesday_count))
-
-import json
+    try:
+        wednesday_count = sum(1 for date in dates if datetime.datetime.strptime(date.strip(), "%Y-%m-%d").weekday() == 2)
+        
+        with open(output_path, "w") as f:
+            f.write(str(wednesday_count))
+        
+        return f"Wednesdays counted: {wednesday_count}"
+    except ValueError:
+        return "Invalid date format in file."
 
 def sort_contacts():
-    """Sort contacts by last_name and first_name"""
-    with open("/data/contacts.json", "r") as f:
-        contacts = json.load(f)
+    """Sort contacts in contacts.json"""
+    file_path = os.path.join(DATA_DIR, "contacts.json")
+    output_path = os.path.join(DATA_DIR, "contacts-sorted.json")
 
-    contacts.sort(key=lambda x: (x["last_name"], x["first_name"]))
+    if not os.path.exists(file_path):
+        return "Contacts file not found."
 
-    with open("/data/contacts-sorted.json", "w") as f:
-        json.dump(contacts, f, indent=2)
+    try:
+        with open(file_path, "r") as f:
+            contacts = json.load(f)
 
-import glob
+        contacts.sort(key=lambda x: (x.get("last_name", ""), x.get("first_name", "")))
+
+        with open(output_path, "w") as f:
+            json.dump(contacts, f, indent=2)
+
+        return "Contacts sorted successfully."
+    except (json.JSONDecodeError, KeyError):
+        return "Invalid contacts file format."
 
 def recent_logs():
-    """Extract the first line of the 10 most recent log files"""
-    log_files = sorted(glob.glob("/data/logs/*.log"), key=os.path.getmtime, reverse=True)[:10]
+    """Extract first line of the 10 most recent log files"""
+    log_files = sorted(glob.glob(os.path.join(DATA_DIR, "logs", "*.log")), key=os.path.getmtime, reverse=True)[:10]
+    output_path = os.path.join(DATA_DIR, "logs-recent.txt")
 
-    with open("/data/logs-recent.txt", "w") as f:
+    if not log_files:
+        return "No log files found."
+
+    with open(output_path, "w") as f:
         for log in log_files:
-            with open(log, "r") as lf:
-                first_line = lf.readline().strip()
-                f.write(first_line + "\n")
+            try:
+                with open(log, "r") as lf:
+                    first_line = lf.readline().strip()
+                    f.write(first_line + "\n")
+            except Exception:
+                continue
+
+    return "Recent logs extracted successfully."
 
 def execute_task(task):
-    """Identify the task and execute the corresponding function"""
-    if "install uv" in task and "run datagen.py" in task:
-        return run_datagen(task.split()[-1])  # Extract email from task
-    elif "format markdown" in task or "format /data/format.md" in task:
-        return format_markdown()
-    elif "count Wednesdays" in task:
-        return count_wednesdays()
-    elif "sort contacts" in task:
-        return sort_contacts()
-    elif "recent log files" in task:
-        return recent_logs()
-    else:
-        raise ValueError("Unknown task")
+    """Identify and execute task"""
+    task_map = {
+        "run datagen.py": lambda arg: run_datagen(arg),
+        "format markdown": format_markdown,
+        "count wednesdays": count_wednesdays,
+        "sort contacts": sort_contacts,
+        "recent logs": recent_logs
+    }
+
+    for key, func in task_map.items():
+        if key in task.lower():
+            if "run datagen.py" in key:
+                email = task.split()[-1]  # Extract email
+                return func(email)
+            return func()
+
+    raise ValueError("Unknown task")

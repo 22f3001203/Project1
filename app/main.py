@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
-from tasks import execute_task
-from utils import read_file
+from app.tasks import execute_task
+from app.utils import read_file
+
 
 app = FastAPI()
 
