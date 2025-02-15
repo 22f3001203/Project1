@@ -11,20 +11,18 @@ from app.utils import read_file
 DATA_DIR = "/data/"
 
 def install_uv():
-    """Ensure uv is installed"""
+    
     try:
         subprocess.run(["uv", "--version"], check=True)
     except FileNotFoundError:
         subprocess.run(["pip", "install", "uv"], check=True)
 
 def run_datagen(email):
-    """Download and run datagen.py"""
     install_uv()
     subprocess.run(["python", "-m", "pip", "install", "requests"], check=True)
 
     datagen_path = os.path.join(DATA_DIR, "datagen.py")
     
-    # Download the script first before executing it
     try:
         response = requests.get("https://raw.githubusercontent.com/sanand0/tools-in-data-science-public/tds-2025-01/project-1/datagen.py")
         response.raise_for_status()
@@ -37,14 +35,12 @@ def run_datagen(email):
         return f"Error fetching datagen.py: {str(e)}"
 
 def ensure_prettier():
-    """Ensure Prettier is installed"""
     try:
         subprocess.run(["npx", "prettier", "--version"], check=True)
     except FileNotFoundError:
         subprocess.run(["npm", "install", "-g", "prettier"], check=True)
 
 def format_markdown():
-    """Format markdown file using Prettier"""
     ensure_prettier()
     md_file = os.path.join(DATA_DIR, "format.md")
     
@@ -55,7 +51,6 @@ def format_markdown():
     return "Markdown file formatted."
 
 def count_wednesdays():
-    """Count Wednesdays in dates.txt"""
     file_path = os.path.join(DATA_DIR, "dates.txt")
     output_path = os.path.join(DATA_DIR, "dates-wednesdays.txt")
 
@@ -76,7 +71,6 @@ def count_wednesdays():
         return "Invalid date format in file."
 
 def sort_contacts():
-    """Sort contacts in contacts.json"""
     file_path = os.path.join(DATA_DIR, "contacts.json")
     output_path = os.path.join(DATA_DIR, "contacts-sorted.json")
 
@@ -97,7 +91,6 @@ def sort_contacts():
         return "Invalid contacts file format."
 
 def recent_logs():
-    """Extract first line of the 10 most recent log files"""
     log_files = sorted(glob.glob(os.path.join(DATA_DIR, "logs", "*.log")), key=os.path.getmtime, reverse=True)[:10]
     output_path = os.path.join(DATA_DIR, "logs-recent.txt")
 
@@ -116,7 +109,6 @@ def recent_logs():
     return "Recent logs extracted successfully."
 
 def execute_task(task):
-    """Identify and execute task"""
     task_map = {
         "run datagen.py": lambda arg: run_datagen(arg),
         "format markdown": format_markdown,
